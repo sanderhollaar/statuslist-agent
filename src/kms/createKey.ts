@@ -17,7 +17,7 @@ export async function createKey(type: TKeyType, privateKeyHex:string): Promise<I
           publicKeyHex,
           privateKeyHex: bytesToHex(privateKey),
           meta: {
-            algorithms: [...KEY_ALG_MAPPING[type], 'Ed25519'],
+            algorithms: ['EdDSA', 'Ed25519'],
           },
         }
         break
