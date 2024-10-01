@@ -7,12 +7,12 @@ import { bytesToHex, hexToBytes } from '@veramo/utils'
 export async function createKey(type: TKeyType, privateKeyHex:string): Promise<IKey> {
     let key: IKey;
     let privateKey = hexToBytes(privateKeyHex);
-    switch (type) {
-      case 'Ed25519': {
+    switch (type.toLowerCase()) {
+      case 'ed25519': {
         const publicKeyHex = bytesToHex(ed25519.getPublicKey(privateKey))
         key = {
           kms: 'local',
-          type,
+          type: 'Ed25519',
           kid: publicKeyHex,
           publicKeyHex,
           privateKeyHex: bytesToHex(privateKey),
@@ -22,11 +22,11 @@ export async function createKey(type: TKeyType, privateKeyHex:string): Promise<I
         }
         break
       }
-      case 'Secp256r1':
+      case 'secp256r1':
         const publicKeyHex = bytesToHex(p256.getPublicKey(privateKey, true))
         key = {
           kms: 'local',
-          type,
+          type: 'Secp256r1',
           kid: publicKeyHex,
           publicKeyHex,
           privateKeyHex: bytesToHex(privateKey),
@@ -35,12 +35,12 @@ export async function createKey(type: TKeyType, privateKeyHex:string): Promise<I
           },
         }
         break;
-      case 'Secp256k1': {
+      case 'secp256k1': {
         const keyPair = new SigningKey(privateKey)
         const publicKeyHex = keyPair.publicKey.substring(2)
         key = {
           kms: 'local',
-          type,
+          type: 'Secp256k1',
           kid: publicKeyHex,
           publicKeyHex,
           privateKeyHex: bytesToHex(privateKey),
