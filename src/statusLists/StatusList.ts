@@ -1,6 +1,7 @@
 import { base64UrlEncode } from "@utils/base64UrlEncode";
 import { getEnv } from "@utils/getEnv";
 import pako from 'pako';
+import  {Bitstring} from '@digitalcredentials/bitstring';
 
 export interface StatusListOptions {
     name: string;
@@ -23,16 +24,15 @@ export class StatusList {
         this.size = opts.size;
         this.purpose = opts.purpose;
 
-        this.id = getEnv('BASEURL', '') + '/' + this.name
+        this.id = getEnv('BASEURL', '') + '/' + this.name;
     }
 
     public async encode()
     {
-        var dataList:Uint8Array = new Uint8Array(this.size / 8);
+        var dataList = new Bitstring({length: this.size});
         // TODO: fill dataList with actual database entries
+        // bitstring.set(<index>, true);
 
-        const deflator = new pako.Deflate();
-        deflator.push(dataList, true);
-        return base64UrlEncode(deflator.result);
+        return await dataList.encodeBits();
     }
 }

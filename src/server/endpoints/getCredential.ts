@@ -13,13 +13,13 @@ export function getCredential(statusList:StatusList, router:Router) {
                     "@context": [
                         "https://www.w3.org/ns/credentials/v2",
                     ],
-                    "id": statusList.id,
-                    "type": ["VerifiableCredential", "BitstringStatusListCredential"],
+                    "id": statusList.id + '#list',
+                    "type": ["VerifiableCredential", "StatusList2021Credential"], // should be BitstringStatusListCredential
                     "issuer": key!.kid,
                     "validFrom": moment().format(moment.defaultFormatUtc),
                     "credentialSubject": {
                         "id": statusList.id + "#list",
-                        "type": "BitstringStatusList",
+                        "type": "StatusList2021", // should be "BitstringStatusList",
                         "statusPurpose": statusList.purpose,
                         "encodedList": await statusList.encode()
                     }
