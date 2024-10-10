@@ -1,27 +1,29 @@
 import { agent } from 'agent';
 import { Router, Request, Response } from 'express';
-import { StatusList } from 'statusLists/StatusList';
+import { StatusListType } from 'statusLists/StatusListType';
 import moment from 'moment'
 import { CredentialPayload, ProofFormat } from '@veramo/core';
 
-export function getCredential(statusList:StatusList, router:Router) {
-    router!.get('/',
+export function getCredential(statusList:StatusListType, router:Router) {
+    router!.get('/:index',
         async (request: Request, response: Response<string>) => {
+            const list = statusList.get(parseInt(request.params.index));
             const key = await agent.keyManagerGet({kid: "anything"}).catch(() => null);
             try {
+                var basepath = statusList.id + '/' + list.index;
                 var statusListCredential = {
                     "@context": [
                         "https://www.w3.org/ns/credentials/v2",
                     ],
-                    "id": statusList.id + '#list',
+                    "id": basepath + '#list',
                     "type": ["VerifiableCredential", "StatusList2021Credential"], // should be BitstringStatusListCredential
                     "issuer": key!.kid,
                     "validFrom": moment().format(moment.defaultFormatUtc),
                     "credentialSubject": {
-                        "id": statusList.id + "#list",
+                        "id": basepath + "#list",
                         "type": "StatusList2021", // should be "BitstringStatusList",
                         "statusPurpose": statusList.purpose,
-                        "encodedList": await statusList.encode()
+                        "encodedList": list.revoked
                     }
                 }
 
@@ -36,7 +38,7 @@ export function getCredential(statusList:StatusList, router:Router) {
                 response.send(result.proof.jwt);
 
             } catch (e) {
-                return response.status(500).end('Internal server error');
+                response.status(404).end('List not found');
             }
         });
 }

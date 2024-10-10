@@ -1,9 +1,9 @@
 import { loadJsonFiles } from "@utils/loadJsonFiles";
 import { resolveConfPath } from "@utils/resolveConfPath";
-import { StatusList, StatusListOptions } from "./StatusList";
+import { StatusListType, StatusListTypeOptions } from "./StatusListType";
 
 interface StatusListStore {
-    [x:string]: StatusList;
+    [x:string]: StatusListType;
 }
 
 var _store:StatusListStore = {};
@@ -12,10 +12,10 @@ export function getStatusListStore(): StatusListStore {
     return _store;
 }
 
-export function initialiseStatusListStore() {
-    const options = loadJsonFiles<StatusListOptions>({path: resolveConfPath('lists')});
+export async function initialiseStatusListStore() {
+    const options = loadJsonFiles<StatusListTypeOptions>({path: resolveConfPath('lists')});
     for (const opt of options.asArray) {
-        const data = new StatusList(opt);
+        const data = new StatusListType(opt);
         _store[data.name] = data;
     }    
 }

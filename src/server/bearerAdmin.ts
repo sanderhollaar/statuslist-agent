@@ -1,11 +1,11 @@
 import passport from 'passport';
 import { Strategy } from 'passport-http-bearer';
-import { StatusList } from '../statusLists/StatusList';
+import { StatusListType } from '../statusLists/StatusListType';
 
-export function bearerAdmin(statusList:StatusList) {
+export function bearerAdmin(statusList:StatusListType) {
     passport.use(statusList.name + '-admin', new Strategy(
         function (token:string, done:Function) {
-            if (token == statusList.adminToken) {
+            if (statusList.adminTokens.includes(token)) {
                 return done(null, statusList);
             }
             return done(null, false);

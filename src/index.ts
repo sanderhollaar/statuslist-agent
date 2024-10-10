@@ -3,8 +3,8 @@ import { getDbConnection } from './database';
 import { initialiseStatusListStore } from 'statusLists/StatusListStore';
 
 async function main() {
-    const dbConnection = await getDbConnection();
-    initialiseStatusListStore();
+    await getDbConnection();
+    await initialiseStatusListStore();
     await initialiseServer();
 }
 
