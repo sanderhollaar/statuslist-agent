@@ -36,15 +36,20 @@ export class StatusListType {
         this.lists = await repo.find({where:{name: this.name}, order: {index:'ASC'}});
     }
 
-    public get(index:number)
+    public async get(index:number)
     {
-        this.loadLists();
+        await this.loadLists();
         for (const list of this.lists) {
             if (list.index == index) {
                 return list;
             }
         }
         throw new Error("No such list");
+    }
+
+    public createCredentialUrl(listIndex?:number)
+    {
+        return getEnv('BASEURL', '') + '/' + this.name + '/' + (listIndex != undefined ? listIndex : '');
     }
 
     public async newIndex(expirationDate:Date|null|undefined)
@@ -123,30 +128,45 @@ export class StatusListType {
         };
     }
 
-    public async revoke(list:StatusList, index:number) {
-        var dataList = new Bitstring({length: list.size});
-        await dataList.decodeBits(list.content);
+    public async revoke(list:StatusList, index:number, doRevoke:boolean):Promise<string>
+    {
+        const dataList = new Bitstring({buffer:await Bitstring.decodeBits({encoded:list.content})});
+        const revokeList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.revoked})});
 
-        var revokeList = new Bitstring({length: list.size});
-        await revokeList.decodeBits(list.revoked);
+        var retval:string = 'UNKNOWN';
 
         if (dataList.get(index)) {
             if (revokeList.get(index)) {
-                // unrevoke, unsuspend, correct, etc.
-                revokeList.set(index, false);
+                if (doRevoke) {
+                    retval = 'UNCHANGED';
+                }
+                else {
+                    // unrevoke, unsuspend, correct, etc.
+                    revokeList.set(index, false);
+                    retval = 'UNREVOKED';
+                }
             }
             else {
-                // revoke, suspend
-                revokeList.set(index, true);
+                if (doRevoke) {
+                    // revoke, suspend
+                    revokeList.set(index, true);
+                    retval = 'REVOKED';
+                }
+                else {
+                    retval = 'UNCHANGED';
+                }
             }
-            list.revoked = await revokeList.encodeBits();
-            const dbConnection = await getDbConnection();
-            const repo = dbConnection.getRepository(StatusList);
-            await repo.save(list);
+            if (retval != 'UNCHANGED') {
+                list.revoked = await revokeList.encodeBits();
+                const dbConnection = await getDbConnection();
+                const repo = dbConnection.getRepository(StatusList);
+                await repo.save(list);
+            }
         }
         else {
             throw new Error("Credential is not enabled");
         }
+        return retval;
     }
 
     public async status(list:StatusList, index:number) {

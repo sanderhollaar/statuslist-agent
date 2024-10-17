@@ -2,21 +2,37 @@ import { Router, Request, Response } from 'express';
 import passport from 'passport';
 import { StatusListType } from 'statusLists/StatusListType';
 
-/* Request a new index from the indicated statuslist type
+interface RevokeRequest {
+    list:string;
+    index:number;
+    state:string;
+}
+
+interface RevokeResponse {
+    state:string;
+}
+
+/* Adjust the bit value for a specific bit in the bitstring lists
  *
- * A new index is determined. If the previous revision of this statuslist type was considered
- * full, a new statuslist is created.
- * This also returns a specific revoke URL, which would actually work as a toggle-url
- * and a status url to retrieve the specific status of this index
+ * The list parameter refers to the full credential URL of the bitstring credential. We
+ * need to parse this to find the proper status list number.
+ * The status list name should match that of the bitstring credential.
+ * 
+ * If the requested state is already the current state, we return UNCHANGED as state value.
  */
 export function revokeIndex(statusList:StatusListType, router:Router) {
-    router!.get('/api/revoke/:listindex/:credindex',
+    router!.post('/api/revoke',
         passport.authenticate(statusList.name + '-admin', { session: false }),
-        async (request: Request, response: Response) => {
+        async (request: Request<RevokeRequest>, response: Response<RevokeResponse>) => {
             try {
-                const list = statusList.get(parseInt(request.params.listindex));
-                await statusList.revoke(list, parseInt(request.params.credindex));
-                response.status(200).end('ok');
+                const shouldStartWith = statusList.createCredentialUrl();
+                if (!request.body.list.startsWith(shouldStartWith)) {
+                    throw new Error("Incorrect list combination");
+                }
+                const listIndex = parseInt(request.body.list.substring(shouldStartWith.length));
+                const list = await statusList.get(listIndex); // throws an exception if not found               
+                const revokeState = await statusList.revoke(list, parseInt(request.body.index), request.body.state == 'revoke');
+                response.status(200).end(JSON.stringify({state:revokeState}));
             } catch (e) {
                 response.status(404).end('List not found');
             }

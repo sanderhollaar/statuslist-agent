@@ -14,8 +14,6 @@ interface ListIndexResponse {
     size: number;
     id: string;
     url: string;
-    revokeUrl: string;
-    statusUrl: string;
 }
 
 /* Request a new index from the indicated statuslist type
@@ -37,9 +35,7 @@ export function getListIndex(statusList:StatusListType, router:Router) {
                     purpose: statusList.purpose,
                     size: list.size,
                     id: statusList.id + '/' + list.index + '#' + index,
-                    url: getEnv('BASEURL', '') + '/' + statusList.name + '/' + list.index,
-                    revokeUrl: getEnv('BASEURL', '') + '/' + statusList.name + '/api/revoke/' + list.index + '/' + index,
-                    statusUrl: getEnv('BASEURL', '') + '/' + statusList.name + '/api/status/' + list.index + '/' + index,
+                    url: statusList.createCredentialUrl(list.index)
                 }
                 response.send(retval);
             } catch (e) {
