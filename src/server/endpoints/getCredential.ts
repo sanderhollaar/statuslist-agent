@@ -7,7 +7,7 @@ import { CredentialPayload, ProofFormat } from '@veramo/core';
 export function getCredential(statusList:StatusListType, router:Router) {
     router!.get('/:index',
         async (request: Request, response: Response<string>) => {
-            const list = statusList.get(parseInt(request.params.index));
+            const list = await statusList.get(parseInt(request.params.index));
             const key = await agent.keyManagerGet({kid: "anything"}).catch(() => null);
             try {
                 var basepath = statusList.id + '/' + list.index;
