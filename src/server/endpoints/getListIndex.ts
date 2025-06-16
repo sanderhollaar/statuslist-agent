@@ -33,7 +33,7 @@ export function getListIndex(statusList:StatusListType, router:Router) {
                 var retval:ListIndexResponse = {
                     index: index,
                     purpose: statusList.purpose,
-                    size: list.size,
+                    size: list.size * (list.bitsize ?? 1),
                     id: statusList.id + '/' + list.index + '#' + index,
                     url: statusList.createCredentialUrl(list.index)
                 }

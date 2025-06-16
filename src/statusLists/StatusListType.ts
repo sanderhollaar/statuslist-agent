@@ -1,32 +1,45 @@
-import { getEnv } from "@utils/getEnv";
+import { getEnv } from "../utils/getEnv";
 import  {Bitstring} from '@digitalcredentials/bitstring';
-import { StatusList } from "database/entities/StatusList";
-import { getDbConnection } from "database";
+import { StatusList } from "../database/entities/StatusList";
+import { getDbConnection } from "../database/index";
+import { StatusListInterface, StatusListTypeOptions } from 'types';
 
-export interface StatusListTypeOptions {
-    name: string;
-    tokens: string[];
-    size: number;
-    purpose:string;
-}
-
-export class StatusListType {
+export class StatusListType implements StatusListInterface {
     public name:string;
     public id:string;
     public adminTokens:string[];
     public size:number;
     public purpose:string;
+    public type:string;
+    public bitSize:number;
     public lists:StatusList[];
-
+    
     public constructor(opts:StatusListTypeOptions)
     {
         this.name = opts.name;
         this.adminTokens = opts.tokens;
         this.size = opts.size;
         this.purpose = opts.purpose;
+        this.type = opts.type ?? 'StatusList2020';
+        this.bitSize = opts.bitSize ?? 1;
 
         this.id = getEnv('BASEURL', '') + '/' + this.name;
         this.lists = [];
+    }
+
+    public getCredentialType()
+    {
+        switch (this.type) {
+            default:
+            case 'StatusList2020':
+            case 'RevocationList2020Status':
+            case 'SuspensionList2020Status':
+            case 'StatusList2021':
+            case 'RevocationList2021Status':
+            case 'SuspensionList2021Status':
+                break;
+        }
+        return 'StatusListCredential';
     }
 
     public async loadLists()
@@ -82,10 +95,14 @@ export class StatusListType {
         }
         list.size = this.size;
         list.used = 0;
+        list.bitsize = this.bitSize ?? 1;
         var dataList = new Bitstring({length: list.size});
         list.content = await dataList.encodeBits();
-        list.revoked = list.content; // copy the zero list
+        var contentList = new Bitstring({length: list.size * list.bitsize});
+        list.revoked = await contentList.encodeBits();
         await repo.save(list); // create the list id, but this may be superfluous
+
+        this.lists.push(list);
 
         // no try-catch: if we fail here, something else is amiss
         return await this.returnNewIndexFromList(list, expirationDate);
@@ -93,8 +110,8 @@ export class StatusListType {
 
     private async returnNewIndexFromList(list:StatusList, expirationDate:Date|null|undefined)
     {
-        var buffer = await Bitstring.decodeBits({encoded:list.content});
-        var dataList = new Bitstring({buffer});
+        // look in the 'content' list to see if we have a spot available
+        var dataList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.content})});
 
         var index = -1;
         var tries = 10000;
@@ -113,7 +130,7 @@ export class StatusListType {
         // update the list content
         list.content = await dataList.encodeBits();
         list.used = list.used + 1;
-        // update the expiry date of to keep track of when the entire list will expire
+        // update the expiry date to keep track of when the entire list will expire
         if (expirationDate && (!list.expirationDate || expirationDate > list.expirationDate)) {
             list.expirationDate = expirationDate;
         }
@@ -130,32 +147,55 @@ export class StatusListType {
 
     public async revoke(list:StatusList, index:number, doRevoke:boolean):Promise<string>
     {
+        const state = await this.setState(list, index, doRevoke ? 1 : 0, 1);
+        if (state == 'CHANGED') {
+            if (doRevoke) {
+                return 'REVOKED';
+            }
+            else {
+                return 'UNREVOKED';
+            }
+        }
+        return state;
+    }
+
+    private getStateValue(bitString:Bitstring, index:number, bitSize:number)
+    {
+        let retval:number = 0;
+        for(let i = 0;i < bitSize; i++) {
+            const bitval = bitString.get(index + i);
+            retval = (retval << 1) | (bitval ? 1 : 0);
+        }
+        return retval;
+    }
+
+    private setStateValue(bitString:Bitstring, index:number, state:number, bitSize:number)
+    {
+        for(let i = 0;i < bitSize; i++) {
+            // MSB first
+            const valueToSet = ((state & (1 << (bitSize - i - 1))) != 0)  ? true : false;
+            bitString.set(index + i, valueToSet);
+        }
+    }
+
+    public async setState(list:StatusList, index:number, newState:number, mask:number = -1):Promise<string>
+    {
         const dataList = new Bitstring({buffer:await Bitstring.decodeBits({encoded:list.content})});
         const revokeList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.revoked})});
 
         var retval:string = 'UNKNOWN';
 
         if (dataList.get(index)) {
-            if (revokeList.get(index)) {
-                if (doRevoke) {
-                    retval = 'UNCHANGED';
-                }
-                else {
-                    // unrevoke, unsuspend, correct, etc.
-                    revokeList.set(index, false);
-                    retval = 'UNREVOKED';
-                }
+            const state = this.getStateValue(revokeList, index, list.bitsize ?? 1);
+            if ((state & mask) == (newState & mask)) {
+                retval = 'UNCHANGED';
             }
             else {
-                if (doRevoke) {
-                    // revoke, suspend
-                    revokeList.set(index, true);
-                    retval = 'REVOKED';
-                }
-                else {
-                    retval = 'UNCHANGED';
-                }
+                const adjustedState = (state & ~mask) | (newState & mask);
+                this.setStateValue(revokeList, index, adjustedState, list.bitsize ?? 1);
+                retval = 'CHANGED';
             }
+
             if (retval != 'UNCHANGED') {
                 list.revoked = await revokeList.encodeBits();
                 const dbConnection = await getDbConnection();
@@ -169,15 +209,12 @@ export class StatusListType {
         return retval;
     }
 
-    public async status(list:StatusList, index:number) {
-        var dataList = new Bitstring({length: list.size});
-        await dataList.decodeBits(list.content);
-
-        var revokeList = new Bitstring({length: list.size});
-        await revokeList.decodeBits(list.revoked);
+    public async getState(list:StatusList, index:number) {
+        var dataList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.content})});
+        var revokeList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.revoked})});
 
         if (dataList.get(index)) {
-            return revokeList.get(index);
+            return this.getStateValue(revokeList, index, list.bitsize ?? 1);
         }
         else {
             throw new Error("Credential is not enabled");
