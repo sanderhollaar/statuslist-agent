@@ -3,6 +3,9 @@ import  {Bitstring} from '@digitalcredentials/bitstring';
 import { StatusList } from "../database/entities/StatusList";
 import { getDbConnection } from "../database/index";
 import { StatusListInterface, StatusListTypeOptions } from 'types';
+import {gzip, ungzip} from 'pako';
+import { inflateSync, deflateSync } from 'zlib';
+import { toString, fromString } from 'uint8arrays';
 
 export class StatusListType implements StatusListInterface {
     public name:string;
@@ -30,6 +33,8 @@ export class StatusListType implements StatusListInterface {
     public getCredentialType()
     {
         switch (this.type) {
+            case 'BitstringStatusList':
+                return 'BitstringStatusListCredential';
             default:
             case 'StatusList2020':
             case 'RevocationList2020Status':
@@ -219,5 +224,50 @@ export class StatusListType implements StatusListInterface {
         else {
             throw new Error("Credential is not enabled");
         }
-    }    
+    }
+    
+    public static async toZlibCompression(list:StatusList)
+    {
+        const buffer = await Bitstring.decodeBits({encoded:list.revoked})
+        return toString(deflateSync(buffer), 'base64url');
+    }
+
+    // this routine is not used, but it is here for completeness sake
+    public static async fromZlibCompression(data:string)
+    {
+        return inflateSync(fromString(data, 'base64url'));
+    }
+
+    public static async toBase64Encoding(list:StatusList)
+    {
+        const buffer = await Bitstring.decodeBits({encoded:list.revoked})
+        return toString(await gzip(buffer), 'base64');
+    }
+
+    // this routine is not used, but is here for completeness sake
+    public static async fromBase64Encoding(data:string)
+    {
+        return await ungzip(fromString(data, 'base64'));
+    }
+
+    public static async toMultibaseEncoding(list:StatusList)
+    {
+        const buffer = await Bitstring.decodeBits({encoded:list.revoked})
+        return 'u' + toString(await gzip(buffer), 'base64url');
+    }
+
+    // this routine is not used, but is here for completeness sake
+    public static async fromMultibaseEncoding(data:string)
+    {
+        let buffer = null;
+        // these two methods are defined in the spec
+        if (data[0] === 'u') {
+            buffer = fromString(data.substring(1), 'base64url');
+        }
+        else if(data[0] == 'z') {
+            buffer = fromString(data.substring(1), 'base58btc');
+        }
+        return await ungzip(buffer);
+    }
+
 }

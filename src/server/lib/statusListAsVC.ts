@@ -3,14 +3,19 @@ import moment from 'moment';
 import { Factory } from '@muisit/cryptokey';
 import { getKey } from "@utils/keymanager";
 import { JWT } from "jwt/JWT";
+import { StatusListType } from "statusLists/StatusListType";
 
+// The old StatusList2020 implementation:
 // https://github.com/w3c/vc-bitstring-status-list/tree/v0.0.1?tab=readme-ov-file
-
+// The latest BitstringStatusList version
+// https://www.w3.org/TR/vc-bitstring-status-list/
 export async function statusListAsVC(data:StatusListStatus) 
 {
     const key = getKey();
-    var statusListCredential = {
-        "@context": ["https://www.w3.org/ns/credentials/v2", "https://w3id.org/vc-status-list-2021/v1"],
+
+
+    var statusListCredential:any = {
+        "@context": ["https://www.w3.org/ns/credentials/v2"],
         "id": data.basepath,
         "type": ["VerifiableCredential", data.type.getCredentialType()],
         "issuer": await Factory.toDIDJWK(key!),
@@ -20,9 +25,21 @@ export async function statusListAsVC(data:StatusListStatus)
         "credentialSubject": {
             "id": data.basepath + "#list",
             "type": data.type.type,
-            "statusPurpose": data.type.purpose,
-            "encodedList": data.statusList.revoked
+            "statusPurpose": data.type.purpose
+            // encodedList set below
+            // statusSize set below if needed
         }
+    }
+
+    if (data.type.type === 'BitstringStatusList') {
+        if (data.type.bitSize != 1) {
+            statusListCredential.credentialSubject.statusSize = data.type.bitSize;
+        }
+        statusListCredential.credentialSubject.encodedList = await StatusListType.toMultibaseEncoding(data.statusList);
+    }
+    else {
+        statusListCredential['@context'].push("https://w3id.org/vc-status-list-2021/v1");
+        statusListCredential.credentialSubject.encodedList = await StatusListType.toBase64Encoding(data.statusList);
     }
 
     const jwt = new JWT();
@@ -33,7 +50,7 @@ export async function statusListAsVC(data:StatusListStatus)
     jwt.header = {
         alg: key!.algorithms()[0],
         kid: await Factory.toDIDJWK(key!) + '#0',
-        typ: 'jwt_vc_json',
+        typ: 'jwt_vc_json', // should this be vc+jwt?
     };
 
     // It is RECOMMENDED to use the IANA JSON Web Token Claims registry and the IANA JSON

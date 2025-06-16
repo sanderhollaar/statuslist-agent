@@ -16,6 +16,7 @@ export function getCredential(statusList:StatusListType, router:Router) {
             try {
                 let result:any = null;
                 switch (statusList.type) {
+                    case 'BitstringStatusList':
                     case 'StatusList2020':
                     case 'RevocationList2020':
                     case 'SuspensionList2020':
