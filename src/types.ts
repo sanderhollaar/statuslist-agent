@@ -19,6 +19,7 @@ export interface StatusListStatus
     type: StatusListInterface;
     statusList: StatusList;
     basepath:string;
+    date:any;
 }
 
 export interface StatusListTypeOptions {

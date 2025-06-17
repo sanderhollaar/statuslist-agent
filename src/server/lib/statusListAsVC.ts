@@ -1,9 +1,9 @@
-import { StatusListStatus } from "types";
+import { StatusListStatus } from "../../types";
 import moment from 'moment';
 import { Factory } from '@muisit/cryptokey';
-import { getKey } from "@utils/keymanager";
-import { JWT } from "jwt/JWT";
-import { StatusListType } from "statusLists/StatusListType";
+import { getKey } from "../../utils/keymanager";
+import { JWT } from "../../jwt/JWT";
+import { StatusListType } from "../../statusLists/StatusListType";
 
 // The old StatusList2020 implementation:
 // https://github.com/w3c/vc-bitstring-status-list/tree/v0.0.1?tab=readme-ov-file
@@ -13,15 +13,14 @@ export async function statusListAsVC(data:StatusListStatus)
 {
     const key = getKey();
 
-
     var statusListCredential:any = {
         "@context": ["https://www.w3.org/ns/credentials/v2"],
         "id": data.basepath,
         "type": ["VerifiableCredential", data.type.getCredentialType()],
         "issuer": await Factory.toDIDJWK(key!),
-        "validFrom": moment().format(moment.defaultFormatUtc),
-        "validUntil": moment().add(5,'minutes').format(moment.defaultFormatUtc),
-        "issuedAt": moment().format(moment.defaultFormatUtc),
+        "validFrom": moment(data.date).format(moment.defaultFormatUtc),
+        "validUntil": moment(data.date).add(5,'minutes').format(moment.defaultFormatUtc),
+        "issuedAt": moment(data.date).format(moment.defaultFormatUtc),
         "credentialSubject": {
             "id": data.basepath + "#list",
             "type": data.type.type,
@@ -32,9 +31,6 @@ export async function statusListAsVC(data:StatusListStatus)
     }
 
     if (data.type.type === 'BitstringStatusList') {
-        if (data.type.bitSize != 1) {
-            statusListCredential.credentialSubject.statusSize = data.type.bitSize;
-        }
         statusListCredential.credentialSubject.encodedList = await StatusListType.toMultibaseEncoding(data.statusList);
     }
     else {
@@ -61,8 +57,8 @@ export async function statusListAsVC(data:StatusListStatus)
 
     // When the iat (Issued At) and/or exp (Expiration Time) JWT claims are present, they 
     // represent the issuance and expiration time of the signature, respectively.
-    jwt.payload.iat = moment().unix();
-    jwt.payload.exp = moment().add(15, 'minutes').unix();
+    jwt.payload.iat = moment(data.date).unix();
+    jwt.payload.exp = moment(data.date).add(15, 'minutes').unix();
     jwt.payload.jti = statusListCredential.id;
 
     await jwt.sign(key!);

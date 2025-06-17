@@ -3,6 +3,7 @@ import { StatusListType } from 'statusLists/StatusListType';
 import { statusListAsVC } from '../lib/statusListAsVC';
 import { statusListAsJWT } from '../lib/statusListAsJWT';
 import { StatusListStatus } from 'types';
+import moment from 'moment';
 
 export function getCredential(statusList:StatusListType, router:Router) {
     router!.get('/:index',
@@ -11,7 +12,8 @@ export function getCredential(statusList:StatusListType, router:Router) {
             const status:StatusListStatus = {
                 type: statusList,
                 statusList: list,
-                basepath: statusList.id + '/' + list.index
+                basepath: statusList.id + '/' + list.index,
+                date: moment()
             }
             try {
                 let result:any = null;
