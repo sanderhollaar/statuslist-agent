@@ -1,6 +1,7 @@
 import { Express, Router } from 'express'
 
 function print (path:any, layer:any) {
+    path = path || layer.path;
     if (layer.route) {
       layer.route.stack.forEach(print.bind(null, path.concat(split(layer.route.path))))
     } else if (layer.name === 'router' && layer.handle.stack) {

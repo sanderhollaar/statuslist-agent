@@ -26,7 +26,6 @@ export async function statusListAsVC(data:StatusListStatus)
             "type": data.type.type,
             "statusPurpose": data.type.purpose
             // encodedList set below
-            // statusSize set below if needed
         }
     }
 

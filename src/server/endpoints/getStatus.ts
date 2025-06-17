@@ -19,14 +19,14 @@ export function getStatus(statusList:StatusListType, router:Router) {
                 const state = await statusList.getState(list, parseInt(request.params.credindex));
                 if ((list.bitsize ?? 1) == 1) {
                     if (state) {
-                        response.status(200).end({"state":true});
+                        response.status(200).end(JSON.stringify({"status":true}));
                     }
                     else {
-                        response.status(200).end({"state":false});
+                        response.status(200).end(JSON.stringify({"status":false}));
                     }
                 }
                 else {
-                    response.status(200).end({"state":state});
+                    response.status(200).end(JSON.stringify({"status":state}));
                 }
             } catch (e) {
                 response.status(404).end('List not found');

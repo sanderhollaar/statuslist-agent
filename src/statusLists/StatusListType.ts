@@ -1,3 +1,5 @@
+import Debug from 'debug';
+const debug = Debug("status:list");
 import { getEnv } from "../utils/getEnv";
 import  {Bitstring} from '@digitalcredentials/bitstring';
 import { StatusList } from "../database/entities/StatusList";
@@ -72,6 +74,7 @@ export class StatusListType implements StatusListInterface {
 
     public async newIndex(expirationDate:Date|null|undefined)
     {
+        debug("creating new index with expiration ", expirationDate);
         // reload the lists to ensure that we have the latest situation in a multi-user environment
         // TODO: implement a central location or job processor to set the list values
         // to prevent problems. Alternatively, each single-threaded issuer can have its own single-threaded
@@ -115,6 +118,7 @@ export class StatusListType implements StatusListInterface {
 
     private async returnNewIndexFromList(list:StatusList, expirationDate:Date|null|undefined)
     {
+        debug("returning new index from list");
         // look in the 'content' list to see if we have a spot available
         var dataList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.content})});
 
@@ -128,9 +132,11 @@ export class StatusListType implements StatusListInterface {
             }
         }
         if (index < 0) {
+            debug("list appears to be full");
             throw new Error("List appears full");
         }
 
+        debug("found index ", index);
         dataList.set(index, true);
         // update the list content
         list.content = await dataList.encodeBits();
@@ -152,7 +158,8 @@ export class StatusListType implements StatusListInterface {
 
     public async revoke(list:StatusList, index:number, doRevoke:boolean):Promise<string>
     {
-        const state = await this.setState(list, index, doRevoke ? 1 : 0, 1);
+        debug("revoking index ", index, doRevoke);
+        const state = await this.setState(list, index, doRevoke ? 1 : 0, -1);
         if (state == 'CHANGED') {
             if (doRevoke) {
                 return 'REVOKED';
@@ -185,10 +192,15 @@ export class StatusListType implements StatusListInterface {
 
     public async setState(list:StatusList, index:number, newState:number, mask:number = -1):Promise<string>
     {
+        debug("setting state at index ", index, newState, mask);
         const dataList = new Bitstring({buffer:await Bitstring.decodeBits({encoded:list.content})});
         const revokeList = new Bitstring({buffer: await Bitstring.decodeBits({encoded:list.revoked})});
 
         var retval:string = 'UNKNOWN';
+
+        // mask out the bits that are not relevant
+        const bitSizeMask = (1 << this.bitSize) - 1;
+        newState = newState & bitSizeMask;
 
         if (dataList.get(index)) {
             const state = this.getStateValue(revokeList, index, list.bitsize ?? 1);
