@@ -22,6 +22,11 @@ export interface StatusListStatus
     date:any;
 }
 
+export interface StatusListMessage {
+    status: string;
+    message: string;
+}
+
 export interface StatusListTypeOptions {
     name: string;
     tokens: string[];
@@ -29,4 +34,5 @@ export interface StatusListTypeOptions {
     bitSize?: number;
     purpose:string;
     type?:string;
+    messages?:StatusListMessage[];
 }

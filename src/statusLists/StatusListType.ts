@@ -4,7 +4,7 @@ import { getEnv } from "../utils/getEnv";
 import  {Bitstring} from '@digitalcredentials/bitstring';
 import { StatusList } from "../database/entities/StatusList";
 import { getDbConnection } from "../database/index";
-import { StatusListInterface, StatusListTypeOptions } from 'types';
+import { StatusListInterface, StatusListMessage, StatusListTypeOptions } from 'types';
 import {gzip, ungzip} from 'pako';
 import { inflateSync, deflateSync } from 'zlib';
 import { toString, fromString } from 'uint8arrays';
@@ -18,6 +18,7 @@ export class StatusListType implements StatusListInterface {
     public type:string;
     public bitSize:number;
     public lists:StatusList[];
+    public messages?:StatusListMessage[];
     
     public constructor(opts:StatusListTypeOptions)
     {
@@ -27,6 +28,7 @@ export class StatusListType implements StatusListInterface {
         this.purpose = opts.purpose;
         this.type = opts.type ?? 'StatusList2020';
         this.bitSize = opts.bitSize ?? 1;
+        this.messages = opts.messages;
 
         this.id = getEnv('BASEURL', '') + '/' + this.name;
         this.lists = [];
@@ -47,6 +49,34 @@ export class StatusListType implements StatusListInterface {
                 break;
         }
         return 'StatusListCredential';
+    }
+
+    public getStatusCredentialType()
+    {
+        switch (this.type) {
+            case 'BitstringStatusList':
+                return 'BitstringStatusListEntry';
+            case 'RevocationList2020Status':
+            case 'SuspensionList2020Status':
+            case 'RevocationList2021Status':
+            case 'SuspensionList2021Status':
+                return this.type;
+            case 'StatusList2020':
+                if (this.purpose == 'revocation') {
+                    return 'RevocationList2020Status';
+                }
+                else {
+                    return 'SuspensionList2020Status';
+                }
+            case 'StatusList2021':
+                if (this.purpose == 'revocation') {
+                    return 'RevocationList2021Status';
+                }
+                else {
+                    return 'SuspensionList2021Status';
+                }
+        }
+        return 'StatusListStatus';
     }
 
     public async loadLists()
@@ -199,7 +229,10 @@ export class StatusListType implements StatusListInterface {
         var retval:string = 'UNKNOWN';
 
         // mask out the bits that are not relevant
-        const bitSizeMask = (1 << this.bitSize) - 1;
+        // use the bitsize of the database entry instead of the default-size-for-new-lists defined on 
+        // the overall type. In theory, we could then support lists of different sizes, but that
+        // would be strange
+        const bitSizeMask = (1 << (list.bitsize ?? 1)) - 1;
         newState = newState & bitSizeMask;
 
         if (dataList.get(index)) {
