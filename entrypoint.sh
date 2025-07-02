@@ -8,6 +8,7 @@ cat > local.key <<EOD
 }
 EOD
 
+env
 ls -l local.key
 cat local.key
 
