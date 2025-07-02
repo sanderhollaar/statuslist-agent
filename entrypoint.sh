@@ -8,4 +8,7 @@ cat > local.key <<EOD
 }
 EOD
 
+ls -l local.key
+cat local.key
+
 npm run dev
